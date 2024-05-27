@@ -1,0 +1,42 @@
+branches:
+    insider:
+        repo_url: https://github.com/m417z/winbindex-data-insider.git
+        branch: gh-pages
+        data_dir: by_filename_compressed
+        files:
+            [
+                "ntdll.dll",
+                "ci.dll",
+                "ntoskrnl.exe",
+                "rpcrt4.dll",
+                "combase.dll",
+                "clfs.sys",
+            ]
+    arm64:
+        repo_url: https://github.com/m417z/winbindex-data-arm64.git
+        branch: gh-pages
+        data_dir: by_filename_compressed
+        files:
+            [
+                "ntdll.dll",
+                "ci.dll",
+                "ntoskrnl.exe",
+                "rpcrt4.dll",
+                "combase.dll",
+                "clfs.sys",
+            ]
+    main:
+        repo_url: https://github.com/m417z/winbindex.git
+        branch: gh-pages
+        data_dir: data/by_filename_compressed
+        files:
+            [
+                "ntdll.dll",
+                "ci.dll",
+                "ntoskrnl.exe",
+                "rpcrt4.dll",
+                "combase.dll",
+                "clfs.sys",
+            ]
+store_dir: ../sample/store
+repo_dir: ../sample/repos
