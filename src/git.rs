@@ -29,12 +29,12 @@ impl<'a> GitHelper<'a> {
         repo_url: &'a String,
         repo_name: &'a String,
     ) -> Self {
-        return GitHelper {
+        GitHelper {
             repo_dir: repository_path,
             branch_name,
             url: repo_url,
             repo_name,
-        };
+        }
     }
     pub fn pull(&self, repo: &Repository, branch_name: &String) -> Result<(), GitError> {
         let mut remote = repo
@@ -77,29 +77,24 @@ impl<'a> GitHelper<'a> {
     ///
     pub fn clone_or_pull(&self) -> Result<Repository, GitError> {
         // First try and create the repo storage location.
-        let _ = std::fs::create_dir_all(&self.repo_dir);
-        let clone_path = &self.repo_dir.join(&self.repo_name);
+        let _ = std::fs::create_dir_all(self.repo_dir);
+        let clone_path = &self.repo_dir.join(self.repo_name);
         // Check if it exists first before attempting a full clone;
-        let repo = Repository::open(&clone_path);
+        let repo = Repository::open(clone_path);
 
         if repo.is_err() {
             println!("Cloning {}, branch {}", self.url, self.branch_name);
             let repo = RepoBuilder::new()
                 .branch(self.branch_name.as_str())
-                .clone(&self.url, &clone_path).expect("");
-            /* 
-            let repo = match repo {
-                Ok(r) => r,
-                Err(_err) => return Err(GitError::FailedRepoClone),
-            };*/
-            return Ok(repo);
+                .clone(self.url, clone_path).expect("");
+            Ok(repo)
         } else {
             println!("pulling {}, branch {}", self.url, self.branch_name);
 
             let r = repo.unwrap();
             self.pull(&r, self.branch_name)
                 .map_err(|_err| GitError::FailedRepoClone)?;
-            return Ok(r);
+            Ok(r)
         }
     }
 }

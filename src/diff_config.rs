@@ -44,9 +44,9 @@ impl ConfigFile {
             let helper = GitHelper::new(Path::new(&self.repo_dir), &v.branch, &v.repo_url, k);
             helper
                 .clone_or_pull()
-                .map_err(|err| ConfigFileError::GitError(err))?;
+                .map_err(ConfigFileError::GitError)?;
         }
-        return Ok(());
+        Ok(())
     }
     // Opens a config file, or creates one if it does not exist.
     pub(crate) fn open_or_create(path: &Path) -> Result<ConfigFile, ConfigFileError> {
@@ -54,9 +54,9 @@ impl ConfigFile {
         let config: Result<ConfigFile, ConfigFileError>;
         if config_file_result.is_err() {
             config_file_result = File::create(path);
-            let mut config_file_result = match config_file_result {
+            let config_file_result = match config_file_result {
                 Ok(file) => file,
-                Err(e) => return Err(ConfigFileError::FileIOError()),
+                Err(_e) => return Err(ConfigFileError::FileIOError()),
             };
 
             config = Ok(ConfigFile {
@@ -69,15 +69,15 @@ impl ConfigFile {
                 &config.clone().expect("Case shouldn't ever occur"),
             );
             match serde_result {
-                Ok(_config_file) => return config,
-                Err(_e) => return Err(ConfigFileError::ConfigFileCreation),
+                Ok(_config_file) => config,
+                Err(_e) => Err(ConfigFileError::ConfigFileCreation),
             }
         } else {
             let serde_result: Result<ConfigFile, serde_yaml::Error> =
                 serde_yaml::from_reader(config_file_result.expect("Case shouldn't ever occur"));
             match serde_result {
-                Ok(config_file) => return Ok(config_file),
-                Err(_e) => return Err(ConfigFileError::ImproperlyFormattedConfigFile),
+                Ok(config_file) => Ok(config_file),
+                Err(_e) => Err(ConfigFileError::ImproperlyFormattedConfigFile),
             }
         }
     }

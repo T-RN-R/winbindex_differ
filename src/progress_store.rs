@@ -11,18 +11,18 @@ pub struct BinaryProgressStore {
 }
 impl BinaryProgressStore {
     pub fn new() -> Self {
-        return BinaryProgressStore {
+        BinaryProgressStore {
             binarys_indexed: HashMap::new(),
-        };
+        }
     }
     /// Add an entry to the store.
     pub fn add(&mut self, filename:&str, hash: &str){
-        let mut list = self.binarys_indexed.entry(filename.to_string()).or_insert(Vec::new());
+        let list = self.binarys_indexed.entry(filename.to_string()).or_default();
         list.push(hash.to_string());
     }
     /// Checks if a binary+hash combo exists in the store.
     pub fn is_in_index(&mut self, filename:&str, hash: &str)->bool{
-        let mut list = self.binarys_indexed.entry(filename.to_string()).or_insert(Vec::new());
+        let list = self.binarys_indexed.entry(filename.to_string()).or_default();
         list.contains(&hash.to_string())
     }
     /// Checks if there is no entry for a given binary.
@@ -38,10 +38,10 @@ pub struct ProgressStore {
 }
 impl ProgressStore {
     pub fn new(store_path: &str) -> Self {
-        return ProgressStore {
+        ProgressStore {
             store_path: store_path.to_string(),
             branches: HashMap::new(),
-        };
+        }
     }
 }
 #[derive(Debug)]
@@ -79,7 +79,7 @@ impl ProgressStorageProvider {
         let store = serde_yaml::from_reader(fp).expect("invalid YAML");
         return ProgressStorageProvider {
             path: progress_file.as_os_str().to_str().unwrap().to_string(),
-            store: store,
+            store,
         };
     }
 }

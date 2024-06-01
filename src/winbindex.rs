@@ -126,12 +126,12 @@ impl BinaryVersion {
         let patch = parts[2].parse().ok()?;
         let build = parts[3].parse().ok()?;
 
-        return Some(BinaryVersion {
+        Some(BinaryVersion {
             major,
             minor,
             patch,
             build,
-        });
+        })
     }
 }
 impl PartialOrd for BinaryVersion {
@@ -179,9 +179,9 @@ impl From<&str> for Arch {
         }
     }
 }
-impl Into<String> for Arch {
-    fn into(self) -> String {
-        match self {
+impl From<Arch> for String {
+    fn from(val: Arch) -> Self {
+        match val {
             Arch::Amd64 => "amd64".to_owned(),
             Arch::Arm64 => "arm64".to_owned(),
             Arch::Arm => "arm".to_owned(),
@@ -190,6 +190,7 @@ impl Into<String> for Arch {
         }
     }
 }
+
 
 #[derive(Debug)]
 pub struct SymbolServerDownloadUrl {
@@ -237,30 +238,15 @@ impl WinbindexEntry {
         }
 
         for (_, v) in builds.as_ref().unwrap().iter() {
-            for (__, asm) in v.assemblies.iter() {
+            if let Some((__, asm)) = v.assemblies.iter().next() {
                 return BinaryVersion::parse(asm.assembly_identity.version.as_str())
                     .unwrap_or_default();
             }
         }
-        return BinaryVersion::default();
+        BinaryVersion::default()
     }
     pub fn get_name(&self) ->Option<String> {
-        return Some(self.name.clone());
-        /* 
-        let builds = &self.windows_version.builds;
-        if builds.is_none() {
-            return None;
-        }
-
-        for (_, v) in builds.as_ref().unwrap().iter() {
-            for (__, asm) in v.assemblies.iter() {
-                for attr in asm.attributes.iter() {
-                    return Some(attr.name.clone());
-                }
-            }
-        }
-        None
-        */
+        Some(self.name.clone())
     }
     pub fn get_sha256(&self) -> String {
         return self
@@ -294,7 +280,7 @@ impl WinbindexEntry {
             name, file_id, name
         );
 
-        return Some(SymbolServerDownloadUrl { url: url });
+        Some(SymbolServerDownloadUrl { url })
     }
 
     fn set_sha256(&mut self, sha256: String) {
@@ -345,9 +331,8 @@ where
 {
     fn from(values: Vec<T>) -> Self {
         let values = values.clone();
-        let root_entry = values.get(0).unwrap();
-        let root = Tree::new(root_entry);
-        return root;
+        let root_entry = values.first().unwrap();
+        Tree::new(root_entry)
     }
 }
 impl WinbindexFileData {
@@ -373,7 +358,7 @@ impl WinbindexFileData {
         let prev_ver = v.get(prev_idx).unwrap();
         let prev_entry = by_version.get(prev_ver).unwrap();
 
-        return Some(prev_entry.clone());
+        Some(prev_entry.clone())
     }
 }
 #[derive(Debug)]
@@ -413,7 +398,7 @@ impl Winbindex {
             .read_to_string(&mut gz_buf)
             .map_err(|_err| WinbindexError::Gzip)?;
         let mut json: HashMap<String, WinbindexEntry> = serde_json::from_str(&gz_buf)
-            .map_err(|_err| WinbindexError::InvalidWinbindexEntryFormatting(_err))?;
+            .map_err(WinbindexError::InvalidWinbindexEntryFormatting)?;
         for (k, value) in json.iter_mut() {
             value.repo = windbindex_type.to_string();
             value.set_sha256(k.clone());
