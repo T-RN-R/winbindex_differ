@@ -6,6 +6,7 @@
     clippy::pedantic,
     clippy::nursery,
     clippy::cargo,
+    clippy::unwrap_in_result
 )]
 
 use progress::StorageProvider;

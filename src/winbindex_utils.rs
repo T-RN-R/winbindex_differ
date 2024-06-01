@@ -251,7 +251,7 @@ impl WinbindexEntry {
     pub fn get_download_url(&self) -> Option<SymbolServerDownloadUrl> {
         let timestamp: Number = self.get_timestamp();
         // TODO: Handle the cases where virual_size is None
-        let image_size = self.file_info.as_ref().unwrap().virtual_size.clone()?;
+        let image_size = self.file_info.as_ref()?.virtual_size.clone()?;
 
         // Format timestamp as hexadecimal and pad it to at least 8 characters
         let timestamp_hex = format!("{:08X}", timestamp.as_i64()?);
@@ -296,14 +296,14 @@ impl WinbindexFileData {
         }
         let mut v: Vec<_> = by_version.keys().cloned().collect();
         v.sort();
-        let position = v.iter().position(|r| r == &entry.get_version()).unwrap();
+        let position = v.iter().position(|r| r == &entry.get_version())?;
 
         if position == 0 {
             return None;
         }
         let prev_idx = position - 1;
-        let prev_ver = v.get(prev_idx).unwrap();
-        let prev_entry = by_version.get(prev_ver).unwrap();
+        let prev_ver = v.get(prev_idx)?;
+        let prev_entry = by_version.get(prev_ver)?;
 
         Some(prev_entry.clone())
     }
@@ -314,6 +314,7 @@ pub enum WinbindexError {
     //FileRead,
     Gzip,
     InvalidWinbindexEntryFormatting(serde_json::Error),
+    InvalidOsString
 }
 
 pub struct Winbindex {
@@ -337,7 +338,7 @@ impl Winbindex {
             .repo_path
             .join(&self.data_path)
             .join(format!("{}{}", file_name, ".json.gz"));
-        println!("Loading file {}", file_path.to_str().unwrap());
+        println!("Loading file {}", file_path.to_str().ok_or_else(||WinbindexError::InvalidOsString)?);
         let file = File::open(&file_path).map_err(|_err| WinbindexError::FileOpen(file_path))?;
         let mut gz_buf = String::new();
         //let read_to_end = File::read_to_end(&mut file, &mut gz_buf).map_err(|err|WinbindexError::FileRead)?;

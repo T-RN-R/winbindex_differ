@@ -14,6 +14,7 @@ pub enum GitError {
     CouldNotSetTarget,
     SetHeadFailure,
     CheckoutFailure,
+    LocalRepoIsBusted,
 }
 
 pub struct GitHelper<'a> {
@@ -86,12 +87,12 @@ impl<'a> GitHelper<'a> {
             println!("Cloning {}, branch {}", self.url, self.branch_name);
             let repo = RepoBuilder::new()
                 .branch(self.branch_name.as_str())
-                .clone(self.url, clone_path).expect("");
+                .clone(self.url, clone_path).map_err(|_|GitError::CheckoutFailure)?;
             Ok(repo)
         } else {
             println!("pulling {}, branch {}", self.url, self.branch_name);
 
-            let r = repo.unwrap();
+            let r = repo.map_err(|_|GitError::LocalRepoIsBusted)?;
             GitHelper::pull(&r, self.branch_name)
                 .map_err(|_err| GitError::FailedRepoClone)?;
             Ok(r)
