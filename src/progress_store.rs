@@ -1,3 +1,5 @@
+//! Manages progress across multiple runs of the program. This is helpful for CI/CD scenarios.
+
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::fs::File;
@@ -13,17 +15,17 @@ impl BinaryProgressStore {
             binarys_indexed: HashMap::new(),
         };
     }
-
+    /// Add an entry to the store.
     pub fn add(&mut self, filename:&str, hash: &str){
         let mut list = self.binarys_indexed.entry(filename.to_string()).or_insert(Vec::new());
         list.push(hash.to_string());
     }
-
+    /// Checks if a binary+hash combo exists in the store.
     pub fn is_in_index(&mut self, filename:&str, hash: &str)->bool{
         let mut list = self.binarys_indexed.entry(filename.to_string()).or_insert(Vec::new());
         list.contains(&hash.to_string())
     }
-
+    /// Checks if there is no entry for a given binary.
     pub fn none_indexed(&self, filename:&str) -> bool{
         self.binarys_indexed.get(&filename.to_string()).is_none()
     }
@@ -48,16 +50,16 @@ pub struct ProgressStorageProvider {
     store: ProgressStore,
 }
 impl ProgressStorageProvider {
+    /// Gets the store for a given branch.
     pub fn get_or_create_branch_store(&mut self, name: &str) -> &mut BinaryProgressStore {
         self.store.branches.entry(name.to_string()).or_insert(BinaryProgressStore::new())
     }
-
+    /// Flush the store to disk.
     pub fn flush(&self) {
-        println!("{:?}", self);
         let file = File::create(self.path.clone()).expect("File does not exist");
         serde_yaml::to_writer(file, &self.store).unwrap();
     }
-
+    /// Create a new store.
     pub fn new(path: &Path) -> ProgressStorageProvider {
         let _ = std::fs::create_dir_all(path);
         let progress_file = Path::new(path).join("progress.yaml");

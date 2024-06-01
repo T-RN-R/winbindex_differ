@@ -1,3 +1,5 @@
+//! Loads Winbindex metadata for a given file, and exposes operations on it.
+
 use flate2::read::GzDecoder;
 use serde::{Deserialize, Serialize};
 use serde_json::Number;
@@ -9,7 +11,7 @@ use std::{
     io::Read,
     path::{Path, PathBuf},
     rc::Rc,
-    sync::{Weak},
+    sync::Weak,
 };
 
 #[derive(Serialize, Deserialize, Eq, Hash, PartialEq, Clone)]
@@ -56,7 +58,7 @@ struct UpdateInfo {
 }
 
 #[derive(Serialize, Deserialize, Eq, PartialEq, Clone)]
-struct Build {
+pub struct Build {
     #[serde(alias = "updateInfo")]
     update_info: UpdateInfo,
     assemblies: HashMap<String, Assembly>,
@@ -101,7 +103,7 @@ impl Default for FileInfo {
 }
 
 #[derive(Serialize, Deserialize, Eq, PartialEq, Clone)]
-struct WindowsVersion {
+pub struct WindowsVersion {
     pub builds: Option<HashMap<String, Build>>,
 }
 
@@ -344,10 +346,7 @@ where
     fn from(values: Vec<T>) -> Self {
         let values = values.clone();
         let root_entry = values.get(0).unwrap();
-        let mut root = Tree::new(root_entry);
-        for value in values.iter() {
-            // root.insert(value);
-        }
+        let root = Tree::new(root_entry);
         return root;
     }
 }
@@ -380,7 +379,7 @@ impl WinbindexFileData {
 #[derive(Debug)]
 pub enum WinbindexError {
     FileOpen(PathBuf),
-    FileRead,
+    //FileRead,
     Gzip,
     InvalidWinbindexEntryFormatting(serde_json::Error),
 }

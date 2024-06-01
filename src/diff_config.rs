@@ -1,3 +1,7 @@
+//! Data structures for handling diffing configuration files
+//! See `../sample_config.yaml` for an example
+//! 
+//! 
 use crate::git::{GitError, GitHelper};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
@@ -32,7 +36,9 @@ pub struct ConfigFile {
     pub store_dir: String,
     pub repo_dir: String,
 }
+
 impl ConfigFile {
+    /// Pulls latest updates from Winbindex
     pub fn update_repos(&self) -> Result<(), ConfigFileError> {
         for (k, v) in self.branches.iter() {
             let helper = GitHelper::new(Path::new(&self.repo_dir), &v.branch, &v.repo_url, k);
@@ -42,6 +48,7 @@ impl ConfigFile {
         }
         return Ok(());
     }
+    // Opens a config file, or creates one if it does not exist.
     pub(crate) fn open_or_create(path: &Path) -> Result<ConfigFile, ConfigFileError> {
         let mut config_file_result = File::open(path);
         let config: Result<ConfigFile, ConfigFileError>;

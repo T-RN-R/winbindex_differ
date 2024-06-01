@@ -1,6 +1,9 @@
+//! Manages various Git operations that are needed for the project
+
 use git2::build::RepoBuilder;
 use git2::Repository;
 use std::path::Path;
+
 #[derive(Debug, Clone)]
 pub enum GitError {
     FailedRepoClone,

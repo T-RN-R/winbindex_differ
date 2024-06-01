@@ -1,3 +1,5 @@
+//! Responsible for downloading binaries and harnessing Ghidriff 
+
 use std::{ fs::File, io::copy, path::PathBuf, process::Command};
 
 use futures::StreamExt;
@@ -10,7 +12,7 @@ pub enum GhidriffError{
     GhidraProjectDirectoryCreation,
     DiffProjectDirectoryCreation,
     BinaryDownloadDirectoryCreation,
-    BinaryNotFoundOnSymbolServer(String),
+    //BinaryNotFoundOnSymbolServer(String),
     WinbindexEntryNoURL,
     Reqwest(reqwest::Error),
     FileWrite(String),
@@ -25,13 +27,13 @@ pub struct GhidriffDiffingProject {
 
 
 
-
+/// Downloads a given WinbindexEntry to the provided path. Note that the filename is derived from
+/// the WinbindexEntry, and is not controllable.
 pub async fn download_binary(path:&PathBuf, winbindex_entry:&WinbindexEntry) -> Result<(), GhidriffError>{
     let url = winbindex_entry.get_download_url().ok_or(GhidriffError::WinbindexEntryNoURL)?;
     let response = reqwest::get(url.url).await.map_err(|e|GhidriffError::Reqwest(e))?;
     let mut dest = {
         let fname = winbindex_entry.get_binary_dlname();
-
         let fname = path.join(fname);
         if fname.exists(){
             return Ok(());
@@ -58,7 +60,8 @@ impl GhidriffDiffingProject {
             arch
         };
     }
-
+    /// Diffs all provided WinbindexEntry on a 2-wide sliding window basis. 
+    /// ie. entries[0] + entries[1] will be diffed, but so will entries[1] + entries[2]
     pub async fn run_diff_on_all(&self, entries: &Vec<WinbindexEntry>) -> Result<(),GhidriffError> {
         //1. Make temporary directory for binaries
         //2. Download all binaries
@@ -99,13 +102,11 @@ impl GhidriffDiffingProject {
         let ghidra_projects_path = self.store_path.join("ghidra_projects");
         let _ = std::fs::create_dir_all(&ghidra_projects_path).map_err(|_e|GhidriffError::GhidraProjectDirectoryCreation)?;
 
-        //[5]
+        //[4]
         let arch_str:String = self.arch.into();
         let diff_folder = &self.store_path.join("diffs").join(&self.winbindex_instance).join(arch_str).join(&self.binary_name);
         let _ = std::fs::create_dir_all(&diff_folder).map_err(|_e|GhidriffError::DiffProjectDirectoryCreation)?;
         
-        //[4]
-
         let ghidra_runs = futures::stream::iter(
             entries.as_slice().windows(2).map(|chunk| {
                 let ghidra_projects_path = ghidra_projects_path.clone();
@@ -115,7 +116,7 @@ impl GhidriffDiffingProject {
                     let new = &chunk[1];
                     let old_fname = old.get_binary_dlname();
                     let new_fname = new.get_binary_dlname();
-        
+                    //[5 + 6]
                     let command = &mut Command::new("ghidriff");
                     let mut ghidriff_command = command
                     .arg("-p")
