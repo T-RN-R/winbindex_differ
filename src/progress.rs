@@ -55,12 +55,13 @@ impl StorageProvider {
         self.store.branches.entry(name.to_string()).or_insert_with(BinaryProgressStore::new)
     }
     /// Flush the store to disk.
-    pub fn flush(&self) {
-        let file = File::create(self.path.clone()).expect("File does not exist");
-        serde_yaml::to_writer(file, &self.store).unwrap();
+    pub fn flush(&self) ->Option<()> {
+        let file = File::create(self.path.clone()).ok()?;
+        serde_yaml::to_writer(file, &self.store).ok()?;
+        Some(())
     }
     /// Create a new store.
-    pub fn new(path: &Path) -> Self {
+    pub fn new_or_create(path: &Path) -> Option<Self> {
         let _ = std::fs::create_dir_all(path);
         let progress_file = Path::new(path).join("progress.yaml");
         let mut file = File::open(&progress_file);
@@ -69,17 +70,17 @@ impl StorageProvider {
             // Create a new store if not found.
             file = File::create(&progress_file);
             serde_yaml::to_writer(
-                file.expect("Could not create file"),
-                &Store::new(path.as_os_str().to_str().unwrap()),
+                file.ok()?,
+                &Store::new(path.as_os_str().to_str()?),
             )
-            .expect("Couldn't write yaml");
+            .ok()?;
         }
         file = File::open(&progress_file);
-        let fp = file.expect("Could not open or create file");
-        let store = serde_yaml::from_reader(fp).expect("invalid YAML");
-        Self {
-            path: progress_file.as_os_str().to_str().unwrap().to_string(),
+        let fp = file.ok()?;
+        let store = serde_yaml::from_reader(fp).ok()?;
+        Some(Self {
+            path: progress_file.as_os_str().to_str()?.to_string(),
             store,
-        }
+        })
     }
 }

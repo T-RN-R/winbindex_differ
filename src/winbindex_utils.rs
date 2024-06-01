@@ -205,26 +205,24 @@ pub struct WinbindexEntry {
     pub name: String,
 }
 impl WinbindexEntry {
-    pub fn get_binary_dlname(&self) -> String {
-        format!("{}_{}", self.get_sha256(), self.get_name())
+    pub fn get_binary_dlname(&self) -> Option<String> {
+        Some(format!("{}_{}", self.get_sha256()?, self.get_name()))
     }
-    pub fn get_arch(&self) -> Arch {
+    pub fn get_arch(&self) -> Option<Arch> {
         //https://learn.microsoft.com/en-us/dotnet/api/system.reflection.portableexecutable.machine?view=net-8.0
-        match self.file_info.as_ref().unwrap().machine_type.as_u64().unwrap(){
-            34404 => Arch::Amd64,
-            332 => Arch::X86,
-            452 => Arch::Arm,
-            43620 => Arch::Arm64,
-            _ => Arch::Invalid
+        match self.file_info.as_ref()?.machine_type.as_u64()?{
+            34404 => Some(Arch::Amd64),
+            332 => Some(Arch::X86),
+            452 => Some(Arch::Arm),
+            43620 => Some(Arch::Arm64),
+            _ => Some(Arch::Invalid)
         }
     }
     pub fn get_version(&self) -> BinaryVersion {
-        let builds = &self.windows_version.builds;
-        if builds.is_none() {
-            return BinaryVersion::default();
-        }
+        let builds = &self.windows_version.builds.clone().unwrap_or_default();
+        let values = builds.values();
 
-        for v in builds.as_ref().unwrap().values() {
+        for v in values {
             if let Some((__, asm)) = v.assemblies.iter().next() {
                 return BinaryVersion::parse(asm.assembly_identity.version.as_str())
                     .unwrap_or_default();
@@ -235,21 +233,14 @@ impl WinbindexEntry {
     pub fn get_name(&self) ->String {
         self.name.clone()
     }
-    pub fn get_sha256(&self) -> String {
-        return self
-            .file_info
-            .as_ref()
-            .unwrap()
-            .sha256
-            .as_ref()
-            .unwrap()
-            .clone();
+    pub fn get_sha256(&self) -> Option<String> {
+        self.file_info.clone()?.sha256
     }
-    pub fn get_timestamp(&self) -> Number {
-        self.file_info.as_ref().unwrap().timestamp.clone()
+    pub fn get_timestamp(&self) -> Option<Number> {
+        Some(self.file_info.clone()?.timestamp)
     }
     pub fn get_download_url(&self) -> Option<SymbolServerDownloadUrl> {
-        let timestamp: Number = self.get_timestamp();
+        let timestamp: Number = self.get_timestamp()?;
         // TODO: Handle the cases where virual_size is None
         let image_size = self.file_info.as_ref()?.virtual_size.clone()?;
 
@@ -269,11 +260,9 @@ impl WinbindexEntry {
         Some(SymbolServerDownloadUrl { url })
     }
 
-    fn set_sha256(&mut self, sha256: String) {
-        if self.file_info.is_none() {
-            self.file_info = Some(FileInfo::default());
-        }
-        self.file_info.as_mut().unwrap().sha256 = Some(sha256);
+    fn set_sha256(&mut self, sha256: String)->Result<(),WinbindexError> {
+        self.file_info.as_mut().ok_or(WinbindexError::NoFileInfo)?.sha256 = Some(sha256);
+        Ok(())
     }
 }
 
@@ -314,7 +303,8 @@ pub enum WinbindexError {
     //FileRead,
     Gzip,
     InvalidWinbindexEntryFormatting(serde_json::Error),
-    InvalidOsString
+    InvalidOsString,
+    NoFileInfo,
 }
 
 pub struct Winbindex {
@@ -349,7 +339,7 @@ impl Winbindex {
             .map_err(WinbindexError::InvalidWinbindexEntryFormatting)?;
         for (k, value) in &mut json {
             value.repo = windbindex_type.to_string();
-            value.set_sha256(k.clone());
+            value.set_sha256(k.clone())?;
             value.name = file_name.to_string();
         }
         let mut cleaned_json: HashMap<String, WinbindexEntry> = HashMap::new();

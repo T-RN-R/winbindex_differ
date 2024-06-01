@@ -33,7 +33,7 @@ async fn main() {
     // iterate through all provided Winbindex Git repositorys, this will be arm64, x64 and insider.
     for (repo_name, repo) in &config_file.branches{
         let instance = repo_name;
-        let mut progress_store = StorageProvider::new(store_dir);
+        let mut progress_store = StorageProvider::new_or_create(store_dir).unwrap();
         let progress = progress_store.get_or_create_branch_store(repo_name);
         // iterate through all of the binarys for which  we wish to generate diffs
         for binary_name in &repo.files{
@@ -47,9 +47,9 @@ async fn main() {
             if progress.none_indexed(binary_name){
                 let j = json.clone();
 
-                let amd64 = j.iter().filter_map(|( _k,  v)| (v.get_arch()==Arch::Amd64 && v.get_download_url().is_some()).then_some(v.clone())).collect();
-                let arm64 = j.iter().filter_map(|( _k, v)| (v.get_arch()==Arch::Arm64&& v.get_download_url().is_some()).then_some(v.clone())).collect();
-                let x86 = j.iter().filter_map(|( _k, v)| (v.get_arch()==Arch::X86&& v.get_download_url().is_some()).then_some(v.clone())).collect();
+                let amd64 = j.iter().filter_map(|( _k,  v)| (v.get_arch()?==Arch::Amd64 && v.get_download_url().is_some()).then_some(v.clone())).collect();
+                let arm64 = j.iter().filter_map(|( _k, v)| (v.get_arch()?==Arch::Arm64 && v.get_download_url().is_some()).then_some(v.clone())).collect();
+                let x86 = j.iter().filter_map(|( _k, v)| (v.get_arch()?==Arch::X86 && v.get_download_url().is_some()).then_some(v.clone())).collect();
                 
                 let gd_amd64 = GhidriffDiffingProject::new(Path::new(&config_file.store_dir).to_path_buf(), instance, binary_name,Arch::Amd64);
                 let gd_arm64 = GhidriffDiffingProject::new(Path::new(&config_file.store_dir).to_path_buf(), instance, binary_name,Arch::Arm64);
@@ -59,13 +59,13 @@ async fn main() {
                 gd_arm64.run_diff_on_all(& arm64).await.unwrap();
                 gd_x86.run_diff_on_all(& x86).await.unwrap();
                 for binary in &amd64{
-                    progress.add(binary_name, binary.get_sha256().as_ref());
+                    progress.add(binary_name, binary.get_sha256().unwrap().as_ref());
                 }
                 for binary in &arm64{
-                    progress.add(binary_name, binary.get_sha256().as_ref());
+                    progress.add(binary_name, binary.get_sha256().unwrap().as_ref());
                 }
                 for binary in &x86{
-                    progress.add(binary_name, binary.get_sha256().as_ref());
+                    progress.add(binary_name, binary.get_sha256().unwrap().as_ref());
                 }
         
             }
@@ -88,7 +88,7 @@ async fn main() {
                     let prev = file_data.find_previous_for_entry(data);
                     
                     //[2] run diff
-                    let gd = GhidriffDiffingProject::new(Path::new(&config_file.store_dir).to_path_buf(), instance, binary_name,data.get_arch());
+                    let gd = GhidriffDiffingProject::new(Path::new(&config_file.store_dir).to_path_buf(), instance, binary_name,data.get_arch().unwrap());
                     let mut bins = Vec::new();
                     if prev.is_none(){
                         continue;

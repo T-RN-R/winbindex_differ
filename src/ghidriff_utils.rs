@@ -12,6 +12,7 @@ pub enum GhidriffError{
     GhidraProjectDirectoryCreation,
     DiffProjectDirectoryCreation,
     BinaryDownloadDirectoryCreation,
+    BinaryHasNoFileName,
     //BinaryNotFoundOnSymbolServer(String),
     WinbindexEntryNoURL,
     Reqwest(reqwest::Error),
@@ -34,11 +35,11 @@ pub async fn download_binary(path: &Path, winbindex_entry:&WinbindexEntry) -> Re
     let response = reqwest::get(url.url).await.map_err(GhidriffError::Reqwest)?;
     let mut dest = {
         let fname = winbindex_entry.get_binary_dlname();
-        let fname = path.join(fname);
+        let fname = path.join(fname.ok_or(GhidriffError::BinaryHasNoFileName)?);
         if fname.exists(){
             return Ok(());
         }
-        File::create(&fname).map_err(|_e|GhidriffError::FileWrite(fname.to_str().unwrap().to_string()))?
+        File::create(&fname).map_err(|_e|GhidriffError::FileWrite(fname.to_str().unwrap_or_default().to_string()))?
     };
     let content =  response.text().await.map_err(GhidriffError::Reqwest)?;
     copy(&mut content.as_bytes(), &mut dest).map_err(|_e|GhidriffError::FileWrite(String::new()))?;
@@ -88,13 +89,15 @@ impl GhidriffDiffingProject {
                         match download_binary(&binary_download_path.clone(), &entry.clone()).await {
                             Ok(()) => {
                             }
-                            Err(e) => println!("{:?} | ERROR downloading {}", e, entry.get_download_url().unwrap().url),
+                            Err(e) => {
+                                println!("{:?} | ERROR downloading {}", e, entry.get_download_url()?.url);
+                            },
                         }
                     }
+                    None
                 }
         })
-        ).buffer_unordered(8).collect::<Vec<()>>();
-            //download_binary(&binary_download_path, winbindex_entry).await?;
+        ).buffer_unordered(8).collect::<Vec<Option<()>>>();
 
         fetches.await;
 
@@ -114,24 +117,25 @@ impl GhidriffDiffingProject {
                 async move {
                     let old = &chunk[0];
                     let new = &chunk[1];
-                    let old_fname = old.get_binary_dlname();
-                    let new_fname = new.get_binary_dlname();
+                    let old_fname = old.get_binary_dlname()?;
+                    let new_fname = new.get_binary_dlname()?;
                     //[5 + 6]
                     let command = &mut Command::new("ghidriff");
                     let _ghidriff_command = command
                     .arg("-p")
-                    .arg(ghidra_projects_path.to_str().unwrap())
+                    .arg(ghidra_projects_path.to_str()?)
                     .arg("-o")
-                    .arg(diff_folder.to_str().unwrap())
+                    .arg(diff_folder.to_str()?)
                     .arg("--force-analysis")
                     .arg("--engine")
                     .arg("VersionTrackingDiff")
-                    .arg(binary_download_path.join(old_fname).to_str().unwrap())
-                    .arg(binary_download_path.join(new_fname).to_str().unwrap())
+                    .arg(binary_download_path.join(old_fname).to_str()?)
+                    .arg(binary_download_path.join(new_fname).to_str()?)
                     .status().expect("Could not run Ghidriff");
+                    Some(())
                 }
         })
-        ).buffer_unordered(8).collect::<Vec<()>>();
+        ).buffer_unordered(8).collect::<Vec<Option<()>>>();
         ghidra_runs.await;
         Ok(())
     }
