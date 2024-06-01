@@ -1,13 +1,23 @@
-use progress_store::ProgressStorageProvider;
+//! Diffs Windows binarys based upon Winbindex metadata. Uses Ghidriff to power the diffs.
+//! Intended to be run in CI/CD to produce continuous diffs.
+
+#![warn(
+    clippy::all,
+    clippy::pedantic,
+    clippy::nursery,
+    clippy::cargo,
+)]
+
+use progress::StorageProvider;
 use std::path::Path;
 extern crate tokio;
-use crate::{ghidriff::GhidriffDiffingProject, winbindex::{Arch, Winbindex}};
+use crate::{ghidriff_utils::GhidriffDiffingProject, winbindex_utils::{Arch, Winbindex}};
 
 mod diff_config;
-mod git;
-mod progress_store;
-mod winbindex;
-mod ghidriff;
+mod git_utils;
+mod progress;
+mod winbindex_utils;
+mod ghidriff_utils;
 
 #[tokio::main]
 async fn main() {
@@ -16,17 +26,16 @@ async fn main() {
     let config_file = diff_config::ConfigFile::open_or_create(config_file_path)
         .expect("Could not open config file");
 
-    println!("{:?}", config_file);
     let store_dir = Path::new(config_file.store_dir.as_str());
     config_file.update_repos().unwrap();
 
     // iterate through all provided Winbindex Git repositorys, this will be arm64, x64 and insider.
-    for (repo_name, repo) in config_file.branches.iter(){
+    for (repo_name, repo) in &config_file.branches{
         let instance = repo_name;
-        let mut progress_store = ProgressStorageProvider::new(store_dir);
+        let mut progress_store = StorageProvider::new(store_dir);
         let progress = progress_store.get_or_create_branch_store(repo_name);
         // iterate through all of the binarys for which  we wish to generate diffs
-        for binary_name in repo.files.iter(){
+        for binary_name in &repo.files{
             let wb = Winbindex::new(Path::new(&config_file.repo_dir)
                 .join(repo_name).to_str().unwrap(), &repo.data_dir);
             let file_data = wb.load_file(binary_name, repo_name).unwrap();
@@ -48,13 +57,13 @@ async fn main() {
                 gd_amd64.run_diff_on_all(&amd64).await.unwrap();
                 gd_arm64.run_diff_on_all(& arm64).await.unwrap();
                 gd_x86.run_diff_on_all(& x86).await.unwrap();
-                for binary in amd64.iter(){
+                for binary in &amd64{
                     progress.add(binary_name, binary.get_sha256().as_ref());
                 }
-                for binary in arm64.iter(){
+                for binary in &arm64{
                     progress.add(binary_name, binary.get_sha256().as_ref());
                 }
-                for binary in x86.iter(){
+                for binary in &x86{
                     progress.add(binary_name, binary.get_sha256().as_ref());
                 }
         

@@ -4,14 +4,11 @@ use flate2::read::GzDecoder;
 use serde::{Deserialize, Serialize};
 use serde_json::Number;
 use std::{
-    cell::RefCell,
     cmp::Ordering,
     collections::HashMap,
     fs::File,
     io::Read,
     path::{Path, PathBuf},
-    rc::Rc,
-    sync::Weak,
 };
 
 #[derive(Serialize, Deserialize, Eq, Hash, PartialEq, Clone)]
@@ -85,7 +82,7 @@ pub struct FileInfo {
 }
 impl Default for FileInfo {
     fn default() -> Self {
-        FileInfo {
+        Self {
             size: Number::from(0),
             md5: None,
             sha1: None,
@@ -126,7 +123,7 @@ impl BinaryVersion {
         let patch = parts[2].parse().ok()?;
         let build = parts[3].parse().ok()?;
 
-        Some(BinaryVersion {
+        Some(Self {
             major,
             minor,
             patch,
@@ -152,10 +149,10 @@ impl Ord for BinaryVersion {
 impl Default for BinaryVersion {
     fn default() -> Self {
         Self {
-            major: 100000,
-            minor: 100000,
+            major: 100_000,
+            minor: 100_000,
             patch: 10000,
-            build: 100000,
+            build: 100_000,
         }
     }
 }
@@ -169,13 +166,13 @@ pub enum Arch {
     Invalid,
 }
 impl From<&str> for Arch {
-    fn from(name: &str) -> Arch {
+    fn from(name: &str) -> Self {
         match name {
-            "x86" => Arch::X86,
-            "amd64" => Arch::Amd64,
-            "arm64" => Arch::Arm64,
-            "arm" => Arch::Arm,
-            _ => Arch::Invalid,
+            "x86" => Self::X86,
+            "amd64" => Self::Amd64,
+            "arm64" => Self::Arm64,
+            "arm" => Self::Arm,
+            _ => Self::Invalid,
         }
     }
 }
@@ -186,7 +183,7 @@ impl From<Arch> for String {
             Arch::Arm64 => "arm64".to_owned(),
             Arch::Arm => "arm".to_owned(),
             Arch::X86 => "x86".to_owned(),
-            _ => "Invalid".to_owned(),
+            Arch::Invalid => "Invalid".to_owned(),
         }
     }
 }
@@ -209,7 +206,7 @@ pub struct WinbindexEntry {
 }
 impl WinbindexEntry {
     pub fn get_binary_dlname(&self) -> String {
-        format!("{}_{}", self.get_sha256(), self.get_name().unwrap())
+        format!("{}_{}", self.get_sha256(), self.get_name())
     }
     pub fn get_arch(&self) -> Arch {
         //https://learn.microsoft.com/en-us/dotnet/api/system.reflection.portableexecutable.machine?view=net-8.0
@@ -220,16 +217,6 @@ impl WinbindexEntry {
             43620 => Arch::Arm64,
             _ => Arch::Invalid
         }
-        /* 
-        let builds = &self.windows_version.builds;
-        if builds.is_none() {
-            return Arch::Invalid;
-        }
-        for (_, v) in builds.as_ref().unwrap().iter() {
-            return Arch::from(v.update_info.arch.as_str());
-        }
-        Arch::Invalid
-        */
     }
     pub fn get_version(&self) -> BinaryVersion {
         let builds = &self.windows_version.builds;
@@ -237,7 +224,7 @@ impl WinbindexEntry {
             return BinaryVersion::default();
         }
 
-        for (_, v) in builds.as_ref().unwrap().iter() {
+        for v in builds.as_ref().unwrap().values() {
             if let Some((__, asm)) = v.assemblies.iter().next() {
                 return BinaryVersion::parse(asm.assembly_identity.version.as_str())
                     .unwrap_or_default();
@@ -245,8 +232,8 @@ impl WinbindexEntry {
         }
         BinaryVersion::default()
     }
-    pub fn get_name(&self) ->Option<String> {
-        Some(self.name.clone())
+    pub fn get_name(&self) ->String {
+        self.name.clone()
     }
     pub fn get_sha256(&self) -> String {
         return self
@@ -273,11 +260,10 @@ impl WinbindexEntry {
         let image_size_hex = format!("{:x}", image_size.as_i64()?);
 
         // Combine both parts to create the file_id
-        let file_id = format!("{}{}", timestamp_hex, image_size_hex);
-        let name = self.get_name()?;
+        let file_id = format!("{timestamp_hex}{image_size_hex}");
+        let name = self.get_name();
         let url = format!(
-            "https://msdl.microsoft.com/download/symbols/{}/{}/{}",
-            name, file_id, name
+            "https://msdl.microsoft.com/download/symbols/{name}/{file_id}/{name}"
         );
 
         Some(SymbolServerDownloadUrl { url })
@@ -294,55 +280,16 @@ impl WinbindexEntry {
 pub struct WinbindexFileData {
     pub data: HashMap<String, WinbindexEntry>,
 }
-///Tree struct, intended to be used to generate proper ordering for all Windows builds.
-/// TODO: Construct a tree from all winbindex entries.
-pub struct Tree<T> {
-    
-    pub value: Option<T>,
-    pub parent: Option<Weak<RefCell<Self>>>,
-    pub children: Vec<Rc<RefCell<Self>>>,
-}
 
-impl<T> Tree<T>
-where
-    T: Clone,
-{
-    pub fn new(value: &T) -> Self {
-        Self {
-            value: Some(value.clone()),
-            parent: None,
-            children: vec![],
-        }
-    }
-}
 
-impl<T> Default for Tree<T> {
-    fn default() -> Self {
-        Self {
-            value: Default::default(),
-            parent: Default::default(),
-            children: Default::default(),
-        }
-    }
-}
-impl<T> From<Vec<T>> for Tree<T>
-where
-    T: Clone,
-{
-    fn from(values: Vec<T>) -> Self {
-        let values = values.clone();
-        let root_entry = values.first().unwrap();
-        Tree::new(root_entry)
-    }
-}
 impl WinbindexFileData {
-    pub fn new(data: HashMap<String, WinbindexEntry>) -> Self {
-        WinbindexFileData { data }
+    pub const fn new(data: HashMap<String, WinbindexEntry>) -> Self {
+        Self { data }
     }
 
     pub fn find_previous_for_entry(&self, entry: &WinbindexEntry) -> Option<WinbindexEntry> {
         let mut by_version: HashMap<BinaryVersion, WinbindexEntry> = HashMap::new();
-        for (_k, v) in self.data.clone().into_iter() {
+        for (_k, v) in self.data.clone() {
             if v.get_arch() == entry.get_arch() {
                 by_version.insert(v.get_version(), v);
             }
@@ -376,7 +323,7 @@ pub struct Winbindex {
 
 impl Winbindex {
     pub fn new(repo_path: &str, data_path: &str) -> Self {
-        return Winbindex {
+        return Self {
             repo_path: Path::new(repo_path).to_path_buf(),
             data_path: Path::new(data_path).to_path_buf(),
         };
@@ -399,7 +346,7 @@ impl Winbindex {
             .map_err(|_err| WinbindexError::Gzip)?;
         let mut json: HashMap<String, WinbindexEntry> = serde_json::from_str(&gz_buf)
             .map_err(WinbindexError::InvalidWinbindexEntryFormatting)?;
-        for (k, value) in json.iter_mut() {
+        for (k, value) in &mut json {
             value.repo = windbindex_type.to_string();
             value.set_sha256(k.clone());
             value.name = file_name.to_string();

@@ -23,20 +23,20 @@ pub struct GitHelper<'a> {
     repo_name: &'a String,
 }
 impl<'a> GitHelper<'a> {
-    pub fn new(
+    pub const fn new(
         repository_path: &'a Path,
         branch_name: &'a String,
         repo_url: &'a String,
         repo_name: &'a String,
     ) -> Self {
-        GitHelper {
+        Self {
             repo_dir: repository_path,
             branch_name,
             url: repo_url,
             repo_name,
         }
     }
-    pub fn pull(&self, repo: &Repository, branch_name: &String) -> Result<(), GitError> {
+    pub fn pull(repo: &Repository, branch_name: &String) -> Result<(), GitError> {
         let mut remote = repo
             .find_remote("origin")
             .map_err(|_err| GitError::CouldNotFindRemote("origin".to_string()))?;
@@ -56,7 +56,7 @@ impl<'a> GitHelper<'a> {
         if analysis.0.is_up_to_date() {
             Ok(())
         } else if analysis.0.is_fast_forward() {
-            let refname = format!("refs/heads/{}", branch_name);
+            let refname = format!("refs/heads/{branch_name}");
             let mut reference = repo
                 .find_reference(&refname)
                 .map_err(|_err| GitError::CouldNotFindReference)?;
@@ -92,7 +92,7 @@ impl<'a> GitHelper<'a> {
             println!("pulling {}, branch {}", self.url, self.branch_name);
 
             let r = repo.unwrap();
-            self.pull(&r, self.branch_name)
+            GitHelper::pull(&r, self.branch_name)
                 .map_err(|_err| GitError::FailedRepoClone)?;
             Ok(r)
         }

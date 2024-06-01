@@ -4,7 +4,7 @@ use std::{ fs::File, io::copy, path::{Path, PathBuf}, process::Command};
 
 use futures::StreamExt;
 
-use crate::winbindex::{Arch, WinbindexEntry};
+use crate::winbindex_utils::{Arch, WinbindexEntry};
 
 extern crate reqwest;
 #[derive(Debug)]
@@ -27,8 +27,8 @@ pub struct GhidriffDiffingProject {
 
 
 
-/// Downloads a given WinbindexEntry to the provided path. Note that the filename is derived from
-/// the WinbindexEntry, and is not controllable.
+/// Downloads a given `WinbindexEntry` to the provided path. Note that the filename is derived from
+/// the `WinbindexEntry`, and is not controllable.
 pub async fn download_binary(path: &Path, winbindex_entry:&WinbindexEntry) -> Result<(), GhidriffError>{
     let url = winbindex_entry.get_download_url().ok_or(GhidriffError::WinbindexEntryNoURL)?;
     let response = reqwest::get(url.url).await.map_err(GhidriffError::Reqwest)?;
@@ -41,7 +41,7 @@ pub async fn download_binary(path: &Path, winbindex_entry:&WinbindexEntry) -> Re
         File::create(&fname).map_err(|_e|GhidriffError::FileWrite(fname.to_str().unwrap().to_string()))?
     };
     let content =  response.text().await.map_err(GhidriffError::Reqwest)?;
-    copy(&mut content.as_bytes(), &mut dest).map_err(|_e|GhidriffError::FileWrite("".to_string()))?;
+    copy(&mut content.as_bytes(), &mut dest).map_err(|_e|GhidriffError::FileWrite(String::new()))?;
 
     Ok(())
 }
@@ -60,7 +60,7 @@ impl GhidriffDiffingProject {
             arch
         }
     }
-    /// Diffs all provided WinbindexEntry on a 2-wide sliding window basis. 
+    /// Diffs all provided `WinbindexEntry` on a 2-wide sliding window basis. 
     /// ie. entries[0] + entries[1] will be diffed, but so will entries[1] + entries[2]
     pub async fn run_diff_on_all(&self, entries: &Vec<WinbindexEntry>) -> Result<(),GhidriffError> {
         //1. Make temporary directory for binaries
@@ -84,9 +84,9 @@ impl GhidriffDiffingProject {
             entries.iter().map(|entry| {
                 async move {
                     let binary_download_path = self.store_path.join("binaries").join(&self.winbindex_instance).join(&self.binary_name);
-                    if entry.get_download_url().is_some(){
+                    if let Some(_get_download_url) = entry.get_download_url(){
                         match download_binary(&binary_download_path.clone(), &entry.clone()).await {
-                            Ok(_) => {
+                            Ok(()) => {
                             }
                             Err(e) => println!("{:?} | ERROR downloading {}", e, entry.get_download_url().unwrap().url),
                         }

@@ -11,7 +11,7 @@ pub struct BinaryProgressStore {
 }
 impl BinaryProgressStore {
     pub fn new() -> Self {
-        BinaryProgressStore {
+        Self {
             binarys_indexed: HashMap::new(),
         }
     }
@@ -32,27 +32,27 @@ impl BinaryProgressStore {
 }
 
 #[derive(Serialize, Deserialize, Debug)]
-pub struct ProgressStore {
+pub struct Store {
     store_path: String,
     branches: HashMap<String, BinaryProgressStore>,
 }
-impl ProgressStore {
+impl Store {
     pub fn new(store_path: &str) -> Self {
-        ProgressStore {
+        Self {
             store_path: store_path.to_string(),
             branches: HashMap::new(),
         }
     }
 }
 #[derive(Debug)]
-pub struct ProgressStorageProvider {
+pub struct StorageProvider {
     path: String,
-    store: ProgressStore,
+    store: Store,
 }
-impl ProgressStorageProvider {
+impl StorageProvider {
     /// Gets the store for a given branch.
     pub fn get_or_create_branch_store(&mut self, name: &str) -> &mut BinaryProgressStore {
-        self.store.branches.entry(name.to_string()).or_insert(BinaryProgressStore::new())
+        self.store.branches.entry(name.to_string()).or_insert_with(BinaryProgressStore::new)
     }
     /// Flush the store to disk.
     pub fn flush(&self) {
@@ -60,7 +60,7 @@ impl ProgressStorageProvider {
         serde_yaml::to_writer(file, &self.store).unwrap();
     }
     /// Create a new store.
-    pub fn new(path: &Path) -> ProgressStorageProvider {
+    pub fn new(path: &Path) -> Self {
         let _ = std::fs::create_dir_all(path);
         let progress_file = Path::new(path).join("progress.yaml");
         let mut file = File::open(&progress_file);
@@ -70,16 +70,16 @@ impl ProgressStorageProvider {
             file = File::create(&progress_file);
             serde_yaml::to_writer(
                 file.expect("Could not create file"),
-                &ProgressStore::new(path.as_os_str().to_str().unwrap()),
+                &Store::new(path.as_os_str().to_str().unwrap()),
             )
             .expect("Couldn't write yaml");
         }
         file = File::open(&progress_file);
         let fp = file.expect("Could not open or create file");
         let store = serde_yaml::from_reader(fp).expect("invalid YAML");
-        return ProgressStorageProvider {
+        Self {
             path: progress_file.as_os_str().to_str().unwrap().to_string(),
             store,
-        };
+        }
     }
 }
